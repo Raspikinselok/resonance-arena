@@ -37,10 +37,11 @@ export function startServer({ port = 0, dataDir, chatFn } = {}) {
   async function serveStatic(res, base, rel) {
     const file = normalize(join(base, rel));
     if (!file.startsWith(base)) return json(res, 403, { error: 'forbidden' });
-    try {
-      res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
-      res.end(await readFile(file));
-    } catch { json(res, 404, { error: 'not found' }); }
+    // Erst lesen, dann Kopfzeilen senden: Fehlt die Datei (z. B. /favicon.ico), darf noch nichts gesendet sein.
+    let content;
+    try { content = await readFile(file); } catch { return json(res, 404, { error: 'not found' }); }
+    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.end(content);
   }
 
   // Startet einen Versuch im Hintergrund; Fortschritt kommt über den Ereignisstrom.
@@ -90,7 +91,8 @@ export function startServer({ port = 0, dataDir, chatFn } = {}) {
       if (path.startsWith('/vendor/three/')) return serveStatic(res, join(ROOT, 'node_modules', 'three'), path.slice('/vendor/three/'.length));
       return serveStatic(res, join(ROOT, 'web'), path === '/' ? 'index.html' : path.slice(1));
     } catch (err) {
-      json(res, 500, { error: String(err.message ?? err) });
+      // Eine fehlerhafte Anfrage darf den Server nie beenden
+      if (res.headersSent) res.end(); else json(res, 500, { error: String(err.message ?? err) });
     }
   });
 

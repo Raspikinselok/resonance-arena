@@ -103,7 +103,7 @@ darf negativ sein.
 ## Tests
 
 ```bash
-npm test                 # 18 Tests: Welt, Lösbarkeit, Skill-Regeln, kompletter Weg über die HTTP-API
+npm test                 # 19 Tests: Welt, Lösbarkeit, Skill-Regeln, kompletter Weg über die HTTP-API
 npm run test:live        # echter Lauf gegen den lokalen Modellserver, ohne Browser
 npm run test:live -- --model <id> --condition skills --runs 3 --bank test1
 npm run test:live -- --model <id> --runs 3 --notepad      # mit Notizzettel

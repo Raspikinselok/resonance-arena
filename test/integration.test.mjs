@@ -150,3 +150,13 @@ test('Simulationsläufe sind gekennzeichnet und lernen nicht', async () => {
   assert.equal(runs.at(-1).model, null);
   assert.equal((await api('/api/memory?bank=sim')).episodes.length, 0);
 });
+
+test('fehlende Dateien liefern 404 und beenden den Server nicht (Browser fragt z. B. /favicon.ico ab)', async () => {
+  for (const path of ['/favicon.ico', '/gibt-es-nicht.js', '/vendor/three/nichts.js']) {
+    const res = await fetch(`http://127.0.0.1:${arena.port}${path}`);
+    assert.equal(res.status, 404, path);
+  }
+  const page = await fetch(`http://127.0.0.1:${arena.port}/`);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /RESONANCE ARENA/);
+});

@@ -9,7 +9,7 @@ Auf dem PC: Repo klonen, `start.bat`, in der Arena Qwen wählen. Am Code ist nic
 
 ## Was nachweislich funktioniert
 
-- `npm test`: 18 von 18 Tests grün (Laptop). Sie prüfen Welt, Lösbarkeit aller Varianten für
+- `npm test`: 19 von 19 Tests grün (Laptop). Sie prüfen Welt, Lösbarkeit aller Varianten für
   40 Seeds, Skill-Regeln und den kompletten Weg über die HTTP-API gegen eine Modell-Attrappe.
 - **Echter Modelltest mit `gemma-4-e2b-it@q4_k_m`:** verbinden, Mission, Beobachtung,
   Modellentscheidung, Aktion, Ergebnis, Reflexion, Skill speichern, neuer Lauf mit Skill im
@@ -74,6 +74,10 @@ Zum Ansehen alter Daten den Ordner vorübergehend in `data` umbenennen.
 Mikrofon oder einem Demo-Signal. Mit dem Demo-Signal im Browser-Panel geprüft (28 fps). Die
 Tonfreigabe aus einem echten Tab ist ungetestet, weil sie einen Klick im Freigabe-Dialog braucht.
 
+**Behobener Absturz:** Der Server beendete sich mehrfach (einmal mitten im Protokoll). Ursache: Jede
+Anfrage nach einer fehlenden Datei, etwa `/favicon.ico` von Chrome, löste einen Fehler beim Senden
+der Kopfzeilen aus. Behoben und per Test abgesichert.
+
 ## Der erste interessante Versuch für dich
 
 Dasselbe Protokoll noch einmal, aber mit **„Skills + Reflexion“** oder **„Episodisch“** statt
@@ -90,9 +94,6 @@ sechsmal so lang) und am Wochenende mit Qwen3.8-27B.
   3,1 GB hat. Mitgeladen wird der Bild-Projektor `mmproj-F32.gguf` (1,8 GB), den die Arena nicht
   braucht. Das übersteigt die 4 GB VRAM. Die kleinere Datei `mmproj-F16.gguf` oder ein Laden ohne
   Projektor dürfte Tempo bringen: nicht gemessen.
-- **Serverprozess:** Zweimal endete der Arena-Server ohne erkennbaren Grund (einmal mitten im
-  Protokoll). Seither schreibt der von Claude gestartete Server nach `%TEMP%\arena-server.log`.
-  Mit `start.bat` im eigenen Fenster ist eine Fehlermeldung direkt sichtbar.
 - **Statistik:** Das Protokoll macht einen Lauf je Aufgabe. Es fehlt eine Option für n
   Wiederholungen mit Mittelwert und Streuung im Diagramm.
 - **Nur eine Mission** (Kaltstart, drei Varianten). Die Schnittstelle für weitere steht.
