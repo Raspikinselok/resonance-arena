@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RESONANCE ARENA</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div id="labels"></div>
+
+  <header id="top">
+    <div class="brand">RESONANCE<b>ARENA</b><small>Station Kepler-9</small></div>
+    <div id="objective" class="chip">Mission: Kaltstart</div>
+    <div id="sim-badge" class="chip warn" hidden>SIMULATION · kein Sprachmodell</div>
+    <div class="spacer"></div>
+    <div id="model-chip" class="chip off">nicht verbunden</div>
+    <button id="quality" class="chip ghost" title="Grafikqualität umschalten">Grafik: Auto</button>
+  </header>
+
+  <aside id="left" class="panel">
+    <h2>Missionskontrolle</h2>
+    <label>Modellserver
+      <div class="row"><input id="base-url" placeholder="automatisch suchen" spellcheck="false"><button id="connect">Verbinden</button></div>
+    </label>
+    <div id="conn-status" class="hint">Suche lokalen Modellserver …</div>
+    <label>Modell<select id="model"></select></label>
+    <label>Memory-Bedingung<select id="condition"></select></label>
+    <div class="row">
+      <label>Variante<select id="variant"></select></label>
+      <label class="narrow">Seed<input id="seed" type="number" value="101" min="1"></label>
+    </div>
+    <div class="row">
+      <label>Memory-Bank<input id="bank" value="default" spellcheck="false"></label>
+      <label class="check"><input id="learn" type="checkbox" checked> lernt</label>
+    </div>
+    <label class="check"><input id="simulated" type="checkbox"> Simulationsmodus (ohne Modell, nur UI-Test)</label>
+    <div class="row">
+      <button id="start" class="primary">Mission starten</button>
+      <button id="stop" disabled>Stopp</button>
+    </div>
+    <h3>Vergleichsversuch</h3>
+    <p class="hint">Prüfaufgaben erst ohne Memory, dann Training, dann dieselben Prüfaufgaben mit eingefrorenem Memory. Nutzt die gewählte Memory-Bedingung und eine frische Bank.</p>
+    <button id="protocol">Protokoll starten (7 Läufe)</button>
+    <div id="progress" class="hint"></div>
+  </aside>
+
+  <aside id="right" class="panel">
+    <nav class="tabs">
+      <button data-tab="log" class="active">Agent</button>
+      <button data-tab="memory">Memory &amp; Skills</button>
+    </nav>
+    <section id="tab-log">
+      <div id="run-head" class="hint">Noch kein Lauf.</div>
+      <ol id="log"></ol>
+    </section>
+    <section id="tab-memory" hidden>
+      <div class="row"><span class="hint" id="bank-name"></span><div class="spacer"></div><button id="reset-bank" class="small">Bank leeren</button></div>
+      <div id="skills"></div>
+      <h3>Lektionen</h3><ul id="lessons" class="plain"></ul>
+      <h3>Episoden</h3><ul id="episodes" class="plain"></ul>
+    </section>
+  </aside>
+
+  <footer id="bottom" class="panel">
+    <div class="row head">
+      <h2>Werden die Agenten besser?</h2>
+      <div id="legend"></div>
+      <div class="spacer"></div>
+      <label class="check"><input id="show-sim" type="checkbox"> Simulationsläufe zeigen</label>
+      <a id="export" class="small button" href="/api/export">Daten exportieren</a>
+    </div>
+    <div class="row body">
+      <div id="chart"></div>
+      <div id="verdict"></div>
+    </div>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

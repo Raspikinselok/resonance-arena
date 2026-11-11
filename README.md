@@ -1,47 +1,111 @@
 # RESONANCE ARENA
 
-Ein lebendiges Labor für lokale KI-Agenten: eine browserbasierte 3D-Arena, in der echte lokale
-Sprachmodelle als autonome Agenten eine verlassene Forschungsstation erkunden, Missionen lösen
-und aus ihren Erfahrungen wiederverwendbare Skills ableiten.
+Ein lebendiges Labor für lokale KI-Agenten. In einer browserbasierten 3D-Station handelt ein echtes
+lokales Sprachmodell als autonomer Wartungsroboter: Es beobachtet, entscheidet, handelt, scheitert
+oder gewinnt, wertet seine Erfahrung aus und leitet daraus Skills ab. Die Arena misst, ob dieses
+Gedächtnis beim nächsten Versuch tatsächlich hilft.
 
-Die Kernfrage: **Werden die Agenten tatsächlich besser**, wenn man Gedächtnis, Skill-System,
-Werkzeuge oder Modell austauscht? Jeder Lauf soll messbar und mit anderen Läufen vergleichbar sein.
+Alles läuft lokal. Kein Cloud-Dienst, kein Konto, keine Telemetrie.
 
-> Status: Projekt angelegt, Umgebung geprüft. Die Anwendung selbst ist noch nicht gebaut.
+## Starten (Windows)
 
-## Voraussetzungen
+Voraussetzungen: [Node.js 22+](https://nodejs.org) und ein lokaler Modellserver, bevorzugt
+[LM Studio](https://lmstudio.ai) mit eingeschaltetem Server (Developer → Start Server, Port 1234).
+Ollama funktioniert über dieselbe OpenAI-kompatible Schnittstelle (Port 11434).
 
-- Node.js 22 oder neuer
-- Ein lokaler Modellserver mit OpenAI-kompatibler API, bevorzugt [LM Studio](https://lmstudio.ai) auf Port 1234
-- Git
+1. Doppelklick auf **`start.bat`**. Beim ersten Mal installiert das Skript three.js.
+2. Der Browser öffnet `http://localhost:4173`.
+3. Die Arena sucht den Modellserver selbst und listet dessen Modelle. Modell wählen, **Mission starten**.
 
-## Einrichten
+Ohne Batch-Datei: `npm install`, dann `npm start`.
+
+## Was du siehst
+
+- **Bühne:** Station Kepler-9 mit Atrium, Reaktorhalle, Kontrollraum, Lager und Labor. Der Roboter
+  bewegt sich nur, wenn das Modell es entschieden hat. Lampen an den Geräten zeigen den wahren
+  Zustand (Zuschauer-Sicht), den der Agent selbst erst herausfinden muss.
+- **Agent (rechts):** jede Entscheidung mit Begründung des Modells, Ergebnis, Antwortzeit und Tokens.
+- **Memory & Skills (rechts, zweiter Reiter):** Skills mit Status, Versionen und Belegpunkten.
+- **Unten:** jeder Lauf als Balken (Höhe = Aktionen bis zum Ziel, gestrichelt = gescheitert) und
+  daneben die Aussage in Worten.
+
+## Die Mission „Kaltstart“
+
+Der Reaktor ist ausgefallen. Die Ursache ist verborgen und hängt vom Seed ab: geschlossenes
+Kühlmittelventil, durchgebrannte Sicherung (nur eine von drei Stärken passt) oder widersprüchliche
+Drucksensoren. Drei Fehlstarts sperren den Reaktor. Das Aktionsbudget ist begrenzt.
+
+| Variante | Zweck |
+|---|---|
+| Standard | Training |
+| Umgeräumt | Transfer: gleiche Mechanik, aber Ventil und Sicherungen an anderen Orten, Labor verriegelt, der Wegweiser im Atrium ist veraltet |
+| Verändert | Unbekannte Prüfvariante: zwei Fehler gleichzeitig und eine neue Startprozedur |
+
+## Memory-Bedingungen
+
+| Bedingung | Der Agent bekommt |
+|---|---|
+| Ohne Memory | nur den aktuellen Versuch |
+| Episodisch | frühere Abläufe mit Aktionen und Ergebnissen |
+| Skill-Memory | Skills: Aufgabe, Voraussetzungen, Strategie, Status, Erfolgsbilanz |
+| Skills + Reflexion | Skills, verdichtete Lektionen und einen früheren Ablauf |
+
+Ein Skill ist zunächst nur ein **Vorschlag** des Modells. Er wird **im Test** geführt, sobald er
+einmal im Einsatz war, und gilt erst als **bewährt**, wenn mindestens zwei gemessene Läufe mit ihm
+gelangen und er nicht langsamer ist als die Baseline ohne Memory. Scheitert er wiederholt, wird er
+**verworfen**. Alte Versionen und ihre Belege bleiben sichtbar.
+
+## Der Vergleichsversuch
+
+**Protokoll starten** führt sieben Läufe aus:
+
+1. zwei Prüfaufgaben ohne Memory (Baseline),
+2. drei Trainingsaufgaben mit Memory, der Agent lernt,
+3. dieselben zwei Prüfaufgaben mit eingefrorenem Memory.
+
+Eine Prüfaufgabe ist die Standard-Variante mit unbekanntem Seed, die andere die Variante
+„Verändert“. So zeigt sich, ob ein Skill nur eine Lösung wiederholt oder überträgt. Das Ergebnis
+darf negativ sein.
+
+## Echte Modelle, ehrliche Kennzeichnung
+
+- Die Modellkennung kommt vom Server (`/v1/models`). Nach jedem Lauf zeigt die Kopfzeile, welches
+  Modell der Server in seiner Antwort tatsächlich gemeldet hat.
+- **Denkphase:** Modelle wie Gemma 4 überlegen vor jeder Antwort. Auf dem Laptop kostet das etwa
+  das Sechsfache an Zeit, deshalb ist sie standardmäßig aus und als eigene Versuchsvariable schaltbar.
+- **Simulationsmodus:** zufällige gültige Aktionen ohne Modell, nur zum Testen der Oberfläche.
+  Solche Läufe sind überall als Simulation markiert, lernen nicht und fehlen im Vergleich.
+
+## Tests
 
 ```bash
-git clone https://github.com/Raspikinselok/resonance-arena.git
-cd resonance-arena
-copy .env.example .env    # dann LLM_MODEL an das Gerät anpassen
+npm test                 # 17 Tests: Welt, Lösbarkeit, Skill-Regeln, kompletter Weg über die HTTP-API
+npm run test:live        # echter Lauf gegen den lokalen Modellserver, ohne Browser
+npm run test:live -- --model <id> --condition skills --runs 3 --bank test1
+node tools/model-check.mjs <id>     # Tempo und Tool-Call-Fähigkeit eines Modells
+node tools/think-probe.mjs <id>     # Wirkung der Denk-Einstellungen
 ```
 
-## Modelle prüfen
+`npm test` nutzt eine Modell-Attrappe und prüft die Pipeline, nicht die Modellleistung.
 
-Das Skript misst Ladezeit und Tokens pro Sekunde und testet, ob ein Modell saubere Tool-Calls liefert:
+## Konfiguration
 
-```bash
-node tools/model-check.mjs                       # listet die Modelle des Servers
-node tools/model-check.mjs gemma-4-e2b-it        # testet ein Modell
+`.env.example` nach `.env` kopieren, falls der Server nicht auf dem Standardport läuft:
+
+```
+LLM_BASE_URL=http://localhost:1234/v1
+LLM_MODEL=<modell-id laut /v1/models>
+PORT=4173
 ```
 
-Messwerte der beiden Geräte stehen in [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
+## Daten
 
-## Arbeiten auf zwei Geräten
+Läufe liegen unter `data/runs/`, Memory-Bänke unter `data/memory/`, beides als lesbares JSON und
+nicht im Repository. **Daten exportieren** lädt alles als eine Datei.
 
-GitHub ist die Drehscheibe, Laptop und PC sind Arbeitskopien.
+## Weiterlesen
 
-```bash
-git pull                              # vor dem Arbeiten
-git add . && git commit -m "..."      # nach dem Arbeiten
-git push
-```
-
-Modelle, `.env`, Laufzeitdaten und Agenten-Gedächtnis bleiben lokal und stehen in der `.gitignore`.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Aufbau, Agenten- und Memory-Schnittstellen
+- [HANDOFF.md](HANDOFF.md): Stand und nächste Schritte
+- [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md): Geräte und Messwerte
+- [docs/MISSION.md](docs/MISSION.md): der ursprüngliche Auftrag

@@ -1,0 +1,16 @@
+{
+  "name": "resonance-arena",
+  "version": "0.1.0",
+  "description": "Ein lebendiges Labor für lokale KI-Agenten: 3D-Arena, echte lokale LLMs, messbare Memory- und Skill-Evolution.",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/index.mjs",
+    "test": "node --test",
+    "test:live": "node tools/live-run.mjs"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  }
+}

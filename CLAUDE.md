@@ -13,8 +13,8 @@ und derselbe Versuch lässt sich mit und ohne Gedächtnis wiederholen. Christian
 Blick sehen, ob Agenten besser werden (z. B. Aktionen bis zum Ziel, mit und ohne Skill, auch in
 unbekannten Varianten).
 
-Der vollständige Auftrag gehört nach `docs/MISSION.md`. **Offen: Die bisher gelieferte Fassung
-bricht in Abschnitt 5 ab, die vollständige fehlt noch.**
+Der vollständige Auftrag (12 Abschnitte) liegt seit dem 11.11.2026 vor und gehört unverändert
+nach `docs/MISSION.md`. **Offen: Die Datei ist noch nicht im Repo abgelegt.**
 
 ## Leitplanken aus dem Auftrag
 
