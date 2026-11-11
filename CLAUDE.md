@@ -33,7 +33,7 @@ Details: `docs/ARCHITECTURE.md`.
 - `server/experiments.mjs` Einzellauf, Lernschritt, Vergleichsprotokoll
 - `server/index.mjs` HTTP-API, Ereignisstrom, statische Dateien
 - `web/scene.js` three.js-Szene, `web/app.js` Oberfläche
-- `test/` 17 Tests, `tools/` Messskripte für echte Modelle
+- `test/` 18 Tests, `tools/` Messskripte für echte Modelle
 
 ## Entscheidungen, die nicht ohne Grund kippen sollten
 
@@ -41,6 +41,8 @@ Details: `docs/ARCHITECTURE.md`.
   brauchbares Python.
 - **Zustandsloser Prompt je Schritt** statt wachsendem Chat: kurzer Kontext für kleine Modelle.
 - **Texte der Spielwelt und Prompts auf Englisch**, Oberfläche und Doku auf Deutsch.
+- **Prompt-Reihenfolge: Zustand, dann Verlauf, dann Notizzettel.** Die cache-freundliche Reihenfolge
+  (Verlauf zuerst) schnitt mit Gemma 4 E2B deutlich schlechter ab, siehe `HANDOFF.md`.
 - **Skill-Status nur aus Messungen.** Die Reflexion darf vorschlagen, nicht bestätigen.
 - **Denkphase standardmäßig aus** (`reasoning_effort: "none"`): auf dem Laptop sonst 6-mal langsamer.
 - **Bildrate gedeckelt:** Modell und Grafik teilen sich auf dem Laptop 4 GB VRAM.

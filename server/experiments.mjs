@@ -85,7 +85,7 @@ export function createLab({ store, emit = () => {}, chatFn = chat }) {
       ...input, id: newId('proto'),
     };
     if (p.condition === 'none') throw new Error('Das Protokoll braucht eine Memory-Bedingung zum Vergleichen.');
-    const base = { model: p.model, baseUrl: p.baseUrl, provider: p.provider, simulated: p.simulated, thinking: p.thinking, mission: p.mission ?? 'coldstart', protocolId: p.id, pace: p.pace };
+    const base = { model: p.model, baseUrl: p.baseUrl, provider: p.provider, simulated: p.simulated, thinking: p.thinking, notepad: p.notepad, mission: p.mission ?? 'coldstart', protocolId: p.id, pace: p.pace };
     const plan = [
       ...p.tests.map((t) => ({ ...base, ...t, condition: 'none', phase: 'baseline', learn: false })),
       ...p.trainSeeds.map((seed) => ({ ...base, variant: p.trainVariant, seed, condition: p.condition, bank: p.bank, phase: 'train', learn: true })),

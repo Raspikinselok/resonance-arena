@@ -55,6 +55,30 @@ einmal im Einsatz war, und gilt erst als **bewährt**, wenn mindestens zwei geme
 gelangen und er nicht langsamer ist als die Baseline ohne Memory. Scheitert er wiederholt, wird er
 **verworfen**. Alte Versionen und ihre Belege bleiben sichtbar.
 
+## Notizzettel des Agenten
+
+Jeder Schritt ist ein frischer Modellaufruf. Der Agent sieht dabei, was er bisher getan hat, aber
+nicht, was er sich dabei gedacht hat. Mit dem Schalter **Notizzettel** schreibt er bei jeder
+Entscheidung eine kurze Notiz (Diagnose und restlicher Plan, höchstens 400 Zeichen, rund
+100 Tokens), die im nächsten Schritt wieder im Prompt steht und die vorige ersetzt. Der Zettel gilt
+nur innerhalb einer Mission und ist eine eigene Versuchsvariable, unabhängig von der
+Memory-Bedingung.
+
+## Musik-Modus
+
+Oben rechts **Musik** klicken: aus → Equalizer → Schwarm → beides. Ein Ring aus Balken ums Atrium
+und ein großer Außenring zeigen 48 Frequenzbänder, Staubwolke und Raumlicht pumpen mit dem Bass,
+der Schwarm umkreist den Roboter. Die Tonquelle wählst du daneben:
+
+- **Tab / System:** Der Browser fragt, was geteilt werden soll. Den Tab mit der Musik (oder den
+  ganzen Bildschirm) wählen und **„Tab-Audio teilen“ bzw. „Systemaudio teilen“ anhaken**.
+  Funktioniert in Chrome und Edge. Das mitgeteilte Bild wird nicht verwendet.
+- **Mikrofon:** nimmt auf, was aus den Lautsprechern kommt.
+- **Demo-Signal:** künstliches Signal ohne Ton, zum Ausprobieren.
+
+Der Ton wird nur im Browser analysiert, nicht aufgezeichnet und nicht gesendet. Der Modus ist reine
+Darstellung und hat keinen Einfluss auf Agent oder Messwerte, kostet aber etwas GPU-Leistung.
+
 ## Der Vergleichsversuch
 
 **Protokoll starten** führt sieben Läufe aus:
@@ -79,9 +103,10 @@ darf negativ sein.
 ## Tests
 
 ```bash
-npm test                 # 17 Tests: Welt, Lösbarkeit, Skill-Regeln, kompletter Weg über die HTTP-API
+npm test                 # 18 Tests: Welt, Lösbarkeit, Skill-Regeln, kompletter Weg über die HTTP-API
 npm run test:live        # echter Lauf gegen den lokalen Modellserver, ohne Browser
 npm run test:live -- --model <id> --condition skills --runs 3 --bank test1
+npm run test:live -- --model <id> --runs 3 --notepad      # mit Notizzettel
 node tools/model-check.mjs <id>     # Tempo und Tool-Call-Fähigkeit eines Modells
 node tools/think-probe.mjs <id>     # Wirkung der Denk-Einstellungen
 ```

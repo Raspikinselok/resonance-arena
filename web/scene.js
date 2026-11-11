@@ -254,10 +254,54 @@ export function createScene(canvas, labelLayer) {
     beamAge = 0;
   }
 
+  // ---------- Musik-Modus: Equalizer-Ringe und Schwarm, gespeist aus 48 Frequenzbändern (web/audio.js)
+  const EQ_IN = 48, EQ_OUT = 96;
+  const eq = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }), EQ_IN + EQ_OUT);
+  eq.visible = false; eq.frustumCulled = false;
+  const eqDummy = new THREE.Object3D(), eqColor = new THREE.Color();
+  const eqBin = (i) => (i < EQ_IN ? i : (i - EQ_IN < 48 ? i - EQ_IN : EQ_OUT - 1 - (i - EQ_IN))); // außen gespiegelt: Bass trifft Bass
+  for (let i = 0; i < EQ_IN + EQ_OUT; i++) eq.setColorAt(i, eqColor.setHSL(0.5 + 0.32 * (eqBin(i) / 48), 1, 0.55));
+  scene.add(eq);
+  function drawEq(a) {
+    for (let i = 0; i < EQ_IN + EQ_OUT; i++) {
+      const inner = i < EQ_IN;
+      const angle = (inner ? i / EQ_IN : (i - EQ_IN) / EQ_OUT) * Math.PI * 2;
+      const r = inner ? 6.6 : 27, w = inner ? 0.26 : 0.55;
+      const h = 0.06 + a.bins[eqBin(i)] * (inner ? 4.2 : 10);
+      eqDummy.position.set(Math.cos(angle) * r, h / 2 - (inner ? 0 : 0.45), Math.sin(angle) * r);
+      eqDummy.rotation.y = -angle;
+      eqDummy.scale.set(w, h, w);
+      eqDummy.updateMatrix();
+      eq.setMatrixAt(i, eqDummy.matrix);
+    }
+    eq.instanceMatrix.needsUpdate = true;
+  }
+  const SWARM = 520;
+  const swarmPos = new Float32Array(SWARM * 3);
+  const swarmSeed = Array.from({ length: SWARM }, () => ({ a: Math.random() * Math.PI * 2, r: 1.1 + Math.random() * 3.4, y: Math.random() * 2 - 1, s: 0.4 + Math.random() * 1.3, k: 1 + Math.floor(Math.random() * 4) }));
+  const swarmGeo = new THREE.BufferGeometry();
+  swarmGeo.setAttribute('position', new THREE.BufferAttribute(swarmPos, 3));
+  const swarm = new THREE.Points(swarmGeo, new THREE.PointsMaterial({ color: 0x9bffe0, size: 0.1, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+  swarm.visible = false; swarm.frustumCulled = false;
+  scene.add(swarm);
+  function drawSwarm(a, t, dt) {
+    for (let i = 0; i < SWARM; i++) {
+      const p = swarmSeed[i];
+      p.a += dt * p.s * (0.35 + a.mid * 3.2 + a.bass * 1.6);
+      const r = p.r * (1 + a.bass * 0.9 * Math.sin(t * 2 + p.k));
+      swarmPos[i * 3] = robot.position.x + Math.cos(p.a) * r;
+      swarmPos[i * 3 + 1] = 1.9 + p.y * (0.5 + a.treble * 3.2) + Math.sin(p.a * p.k + t) * 0.4;
+      swarmPos[i * 3 + 2] = robot.position.z + Math.sin(p.a) * r;
+    }
+    swarmGeo.attributes.position.needsUpdate = true;
+    swarm.material.size = 0.08 + a.level * 0.22;
+  }
+  let music = 'off', lightBase = 10;
+
   // ---------- Zustand und öffentliche Schnittstelle
   let path = [], room = 'atrium', thinking = false, view = {};
   let quality = 1, autoQuality = true, fpsCap = 30, last = 0, slow = 0, shown = 0, shownAt = 0;
-  const hooks = { onStats: () => {} };
+  const hooks = { onStats: () => {}, audio: () => null };
 
   function applyQuality(q) {
     quality = Math.max(0, Math.min(2, q));
@@ -302,7 +346,7 @@ export function createScene(canvas, labelLayer) {
     holoState = { online: v.online, alarm: !(v.fuseOk && v.valveOpen && v.sensorOk) };
     const text = { reactor: v.online ? 'ONLINE' : `OFFLINE${v.trips ? ` · ${v.trips}/3 Fehlstarts` : ''}`, lab: v.labLocked ? 'VERRIEGELT' : '' };
     for (const [id, fx] of Object.entries(roomFx)) fx.el.innerHTML = `<b>${ROOMS[id].label}</b>${text[id] ? `<span>${text[id]}</span>` : ''}`;
-    for (const fx of Object.values(roomFx)) fx.light.intensity = v.online ? 16 : 10;
+    lightBase = v.online ? 16 : 10;
   }
   function moveTo(target) {
     if (!ROOMS[target] || target === room) return;
@@ -356,7 +400,17 @@ export function createScene(canvas, labelLayer) {
     core.material.emissiveIntensity = view.online ? 3.2 + Math.sin(t * 6) * 0.6 : 0.9 + Math.sin(t * 1.4) * 0.5;
     core.scale.setScalar(view.online ? 1.1 + Math.sin(t * 6) * 0.04 : 0.92);
     sparks.rotation.y = t * 1.6;
-    dust.rotation.y = t * 0.012;
+    // Musik: Bass lässt Licht und Staubwolke pumpen, Mitten treiben die Drehung, Höhen die Funkengröße
+    const a = music === 'off' ? null : hooks.audio(dt);
+    const live = a?.active ? a : null;
+    dust.rotation.y += dt * (0.012 + (live ? live.mid * 0.9 : 0));
+    dust.scale.y = 1 + (live ? live.bass * 1.3 : 0);
+    dust.material.size = 0.07 + (live ? live.treble * 0.16 : 0);
+    for (const fx of Object.values(roomFx)) fx.light.intensity = lightBase * (1 + (live ? live.bass * 0.9 : 0));
+    eq.visible = Boolean(live) && (music === 'eq' || music === 'both');
+    swarm.visible = Boolean(live) && (music === 'swarm' || music === 'both');
+    if (eq.visible) drawEq(live);
+    if (swarm.visible) drawSwarm(live, t, dt);
     wheel.rotation.z = view.valveOpen ? t * 1.5 : 0;
     barrier.material.opacity *= 0.9 + 0.1 * (0.85 + Math.sin(t * 9) * 0.15);
     if (quality > 0 || Math.floor(t * 4) !== Math.floor((t - dt) * 4)) drawHolo(t);
@@ -395,6 +449,7 @@ export function createScene(canvas, labelLayer) {
   return {
     setView, moveTo, act, reset, hooks,
     setThinking: (on) => { thinking = on; },
+    setMusic: (mode) => { music = mode; },
     say: (text) => { bubbleEl.textContent = text ?? ''; bubble.visible = Boolean(text); },
     cycleQuality() {
       // Auto -> Niedrig -> Mittel -> Hoch -> Auto

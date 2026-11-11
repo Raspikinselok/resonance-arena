@@ -2,6 +2,7 @@
 // Alle Zustände kommen vom Server (REST + Ereignisstrom). Hier wird nichts simuliert.
 
 import { createScene } from './scene.js';
+import { createAudio } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -22,6 +23,28 @@ const scene = createScene($('stage'), $('labels'));
 scene.say(null);
 scene.hooks.onStats = (s) => { $('quality').textContent = `Grafik: ${s.auto ? 'Auto · ' : ''}${s.quality} · ${s.fps} fps`; };
 $('quality').onclick = () => scene.cycleQuality();
+
+// ---------- Musik-Modus (rein lokal im Browser)
+const audio = createAudio();
+scene.hooks.audio = (dt) => audio.update(dt);
+const MUSIC = ['off', 'eq', 'swarm', 'both'];
+const MUSIC_LABEL = { off: 'aus', eq: 'Equalizer', swarm: 'Schwarm', both: 'Equalizer + Schwarm' };
+let musicMode = 'off';
+async function setMusic(mode) {
+  try {
+    if (mode !== 'off' && !audio.state.active) await audio.start($('music-src').value);
+    if (mode === 'off') audio.stop();
+    musicMode = mode;
+  } catch (err) {
+    musicMode = 'off';
+    note(`Musik-Modus: ${err.name === 'NotAllowedError' ? 'Freigabe abgebrochen oder vom Browser nicht erlaubt.' : err.message}`, 'bad');
+  }
+  scene.setMusic(musicMode);
+  $('music').textContent = `Musik: ${MUSIC_LABEL[musicMode]}${musicMode !== 'off' && audio.state.source === 'demo' ? ' (Demo)' : ''}`;
+  $('music').classList.toggle('on', musicMode !== 'off');
+}
+$('music').onclick = () => setMusic(MUSIC[(MUSIC.indexOf(musicMode) + 1) % MUSIC.length]);
+$('music-src').onchange = () => { if (musicMode !== 'off') { audio.stop(); setMusic(musicMode); } };
 
 let meta = { conditions: {}, missions: [] };
 let conn = null;
@@ -61,7 +84,7 @@ function config() {
   return {
     simulated, baseUrl: conn?.baseUrl, provider: conn?.provider, model: $('model').value,
     condition: $('condition').value, variant: $('variant').value, seed: Number($('seed').value) || 1,
-    bank: $('bank').value.trim() || 'default', learn: $('learn').checked, thinking: $('thinking')?.checked ?? false,
+    bank: $('bank').value.trim() || 'default', learn: $('learn').checked, thinking: $('thinking')?.checked ?? false, notepad: $('notepad').checked,
   };
 }
 async function launch(path, cfg) {
@@ -96,7 +119,7 @@ function onEvent(e) {
     log.innerHTML = '';
     liveBank = r.bank ?? liveBank;
     $('sim-badge').hidden = !r.simulated;
-    $('run-head').innerHTML = `<b>${esc(VARIANT[r.variant])}</b> · Seed ${r.seed} · ${esc(meta.conditions[r.condition])}${r.learn && r.condition !== 'none' ? ' · lernt' : ''} · max. ${r.maxSteps} Aktionen`;
+    $('run-head').innerHTML = `<b>${esc(VARIANT[r.variant])}</b> · Seed ${r.seed} · ${esc(meta.conditions[r.condition])}${r.learn && r.condition !== 'none' ? ' · lernt' : ''}${r.notepad ? ' · mit Notizzettel' : ''}${r.thinking ? ' · mit Denkphase' : ''} · max. ${r.maxSteps} Aktionen`;
     scene.reset(e.view);
     if (e.memoryText) {
       const li = note('', 'note');
@@ -122,6 +145,7 @@ function onEvent(e) {
     li.innerHTML = `<div class="act"><span class="n">${e.step}</span>${esc(e.action.tool)}(${args})</div>`
       + (e.why ? `<div class="why">„${esc(e.why)}“</div>` : '')
       + `<div class="res">${e.result.ok ? '' : '✕ '}${esc(e.result.text)}</div>`
+      + (e.note ? `<div class="notepad">Zettel: ${esc(e.note)}</div>` : '')
       + (e.thought ? `<details><summary>Denkphase des Modells</summary><div class="res">${esc(e.thought)}</div></details>` : '')
       + (e.rawReply ? `<details><summary>Rohantwort</summary><div class="res">${esc(e.rawReply)}</div></details>` : '')
       + (speed ? `<div class="meta">${speed}</div>` : '');
@@ -185,19 +209,19 @@ function renderChart() {
     lastGroup = group;
     const h = Math.max(3, (r.steps / 36) * (H - top));
     const color = r.simulated ? '#444e5e' : COLORS[r.condition];
-    const tip = `${r.simulated ? 'SIMULATION' : r.model} · ${meta.conditions[r.condition]} · ${VARIANT[r.variant]} · Seed ${r.seed} · ${r.steps} Aktionen · ${r.success ? 'Erfolg' : `gescheitert (${REASON[r.reason] ?? r.reason})`}${r.thinking ? ' · mit Denkphase' : ''}`;
+    const tip = `${r.simulated ? 'SIMULATION' : r.model} · ${meta.conditions[r.condition]} · ${VARIANT[r.variant]} · Seed ${r.seed} · ${r.steps} Aktionen · ${r.success ? 'Erfolg' : `gescheitert (${REASON[r.reason] ?? r.reason})`}${r.thinking ? ' · mit Denkphase' : ''}${r.notepad ? ' · mit Notizzettel' : ''}`;
     bars += `<g><title>${esc(tip)}</title>
       <rect x="${x}" y="${H - h}" width="${barW}" height="${h}" fill="${r.success ? color : 'none'}" stroke="${color}" stroke-width="1.5" ${r.success ? '' : 'stroke-dasharray="3 2"'}/>
       <text x="${x + barW / 2}" y="${H - h - 4}" text-anchor="middle" fill="${r.success ? '#d7e6f7' : '#ff3b5c'}" font-size="10">${r.success ? r.steps : '✕'}</text>
       <text x="${x + barW / 2}" y="${H + 12}" text-anchor="middle" fill="#7f95b0" font-size="9">${PHASE[r.phase] ?? '·'}</text>
-      <text x="${x + barW / 2}" y="${H + 23}" text-anchor="middle" fill="${r.variant === 'standard' ? '#55708f' : '#ffb347'}" font-size="9">${VARIANT[r.variant][0]}</text></g>`;
+      <text x="${x + barW / 2}" y="${H + 23}" text-anchor="middle" fill="${r.variant === 'standard' ? '#55708f' : '#ffb347'}" font-size="9">${VARIANT[r.variant][0]}${r.notepad ? 'ⁿ' : ''}</text></g>`;
     x += barW + gap;
   }
   const axis = [0, 12, 24, 36].map((v) => { const y = H - (v / 36) * (H - top); return `<line x1="26" x2="${x}" y1="${y}" y2="${y}" stroke="rgba(90,190,255,.1)"/><text x="22" y="${y + 3}" text-anchor="end" fill="#55708f" font-size="9">${v}</text>`; }).join('');
   $('chart').innerHTML = list.length
     ? `<svg width="${Math.max(x + 10, 300)}" viewBox="0 0 ${Math.max(x + 10, 300)} ${H + 28}" font-family="Consolas, monospace">${axis}${bars}</svg>`
     : '<p class="empty">Noch keine Läufe. Balkenhöhe = Aktionen bis zum Ziel, gestrichelt = gescheitert. B Baseline · T Training · P Prüfung.</p>';
-  $('legend').innerHTML = Object.entries(meta.conditions).map(([id, name]) => `<span><i style="background:${COLORS[id]}"></i>${esc(name)}</span>`).join('') + '<span>B Baseline · T Training · P Prüfung · S/U/V Variante</span>';
+  $('legend').innerHTML = Object.entries(meta.conditions).map(([id, name]) => `<span><i style="background:${COLORS[id]}"></i>${esc(name)}</span>`).join('') + '<span>B Baseline · T Training · P Prüfung · S/U/V Variante · ⁿ mit Notizzettel</span>';
   $('chart').scrollLeft = 1e6;
 }
 
@@ -226,12 +250,12 @@ function renderVerdict() {
     return;
   }
   if (!real.length) { $('verdict').innerHTML = '<p class="empty">Die Aussage entsteht aus echten Läufen. Starte eine Mission oder das Protokoll.</p>'; return; }
-  const byCond = Object.keys(meta.conditions).map((c) => {
-    const rs = real.filter((r) => r.condition === c);
+  const byCond = Object.keys(meta.conditions).flatMap((c) => [false, true].map((np) => [c, np])).map(([c, np]) => {
+    const rs = real.filter((r) => r.condition === c && Boolean(r.notepad) === np);
     if (!rs.length) return '';
     const wins = rs.filter((r) => r.success);
     const mean = wins.length ? (wins.reduce((a, r) => a + r.steps, 0) / wins.length).toFixed(1) : '–';
-    return `<div><b>${esc(meta.conditions[c])}</b>: ${wins.length} von ${rs.length} erfolgreich, Ø ${mean} Aktionen bei Erfolg</div>`;
+    return `<div><b>${esc(meta.conditions[c])}${np ? ' + Notizzettel' : ''}</b>: ${wins.length} von ${rs.length} erfolgreich, Ø ${mean} Aktionen bei Erfolg</div>`;
   }).join('');
   $('verdict').innerHTML = `${byCond}<div class="hint">Einzelläufe mit unterschiedlichen Aufgaben sind nur grob vergleichbar. Das Protokoll stellt allen Bedingungen dieselben Aufgaben.</div>`;
 }

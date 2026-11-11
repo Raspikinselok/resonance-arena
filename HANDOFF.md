@@ -9,7 +9,7 @@ Auf dem PC: Repo klonen, `start.bat`, in der Arena Qwen wählen. Am Code ist nic
 
 ## Was nachweislich funktioniert
 
-- `npm test`: 17 von 17 Tests grün (Laptop). Sie prüfen Welt, Lösbarkeit aller Varianten für
+- `npm test`: 18 von 18 Tests grün (Laptop). Sie prüfen Welt, Lösbarkeit aller Varianten für
   40 Seeds, Skill-Regeln und den kompletten Weg über die HTTP-API gegen eine Modell-Attrappe.
 - **Echter Modelltest mit `gemma-4-e2b-it@q4_k_m`:** verbinden, Mission, Beobachtung,
   Modellentscheidung, Aktion, Ergebnis, Reflexion, Skill speichern, neuer Lauf mit Skill im
@@ -44,6 +44,36 @@ Technische Anmerkung: Das Protokoll wurde nach Lauf 4 unterbrochen, weil der Ser
 beendet wurde. Die Läufe 5 bis 7 wurden mit derselben Protokoll-ID und Memory-Bank nachgeholt.
 Die nachträgliche Wertung der Prüfläufe als Skill-Belege ist dabei nicht gelaufen.
 
+## Nachtrag am selben Abend: Notizzettel, Prompt-Reihenfolge, Musik-Modus
+
+**Notizzettel** (Schalter in der Missionskontrolle, `--notepad` im Live-Test): Der Agent schreibt bei
+jeder Entscheidung eine Notiz (max. 400 Zeichen), die im nächsten Schritt wieder im Prompt steht.
+Vergleich mit Gemma 4 E2B, Standard-Variante, ohne Langzeit-Memory, ein Lauf je Seed:
+
+| Seed (Ursache) | Ohne Zettel | Mit Zettel |
+|---|---|---|
+| 201 (Sensor) | Erfolg in 18, 1 Fehlstart | Erfolg in 18, kein Fehlstart |
+| 202 (Sensor) | Erfolg in 18, 1 Fehlstart | Erfolg in 16, kein Fehlstart |
+| 203 (Sicherung) | gescheitert, Reaktor gesperrt nach 17 | gescheitert, Budget (30) aufgebraucht |
+
+Antwortzeit je Entscheidung: rund 4,8 s ohne, rund 10 s mit Zettel, weil das Modell mehr schreibt.
+Der Zettel hat in dieser Stichprobe die Fehlstarts vermieden, aber kaum Aktionen gespart. Drei
+Läufe je Seite sind zu wenig für ein Urteil. Die Sicherungs-Aufgabe (passende Stärke aus dem Lager
+holen) hat E2B bisher in keinem Lauf gelöst.
+
+**Prompt-Reihenfolge:** Eine cache-freundliche Variante (Verlauf zuerst, nur anhängen) ergab 0 von 3
+erfolgreichen Läufen und keine kürzere Antwortzeit. Mit der ursprünglichen Reihenfolge waren es
+direkt danach 2 von 3. Sie ist wieder der Stand. Ob der KV-Cache des Servers greift, ist damit
+weiter offen; messen ließe es sich über die Prompt-Verarbeitungszeit im LM-Studio-Log.
+
+**Daten:** Die Läufe des ersten Protokolls liegen in `data-v1-vor-notizzettel/`, die der verworfenen
+Reihenfolge in `data-v2-cache-reihenfolge/`. `data/` enthält nur Läufe mit dem aktuellen Stand.
+Zum Ansehen alter Daten den Ordner vorübergehend in `data` umbenennen.
+
+**Musik-Modus:** Equalizer-Ringe, pumpende Staubwolke und Schwarm, gespeist aus Tab-/Systemton,
+Mikrofon oder einem Demo-Signal. Mit dem Demo-Signal im Browser-Panel geprüft (28 fps). Die
+Tonfreigabe aus einem echten Tab ist ungetestet, weil sie einen Klick im Freigabe-Dialog braucht.
+
 ## Der erste interessante Versuch für dich
 
 Dasselbe Protokoll noch einmal, aber mit **„Skills + Reflexion“** oder **„Episodisch“** statt
@@ -56,6 +86,13 @@ sechsmal so lang) und am Wochenende mit Qwen3.8-27B.
 - **Skills kleiner Modelle sind zu vage und doppeln sich.** Die Reflexion von E2B liefert drei fast
   gleiche Skills unter verschiedenen Namen. Nächster Schritt: Reflexions-Prompt mit Beispiel für
   einen konkreten Skill, Ähnlichkeitsprüfung vor dem Anlegen.
+- **Speicher in LM Studio:** Das geladene Modell belegt laut `lms ps` 5,0 GB, obwohl die Modelldatei
+  3,1 GB hat. Mitgeladen wird der Bild-Projektor `mmproj-F32.gguf` (1,8 GB), den die Arena nicht
+  braucht. Das übersteigt die 4 GB VRAM. Die kleinere Datei `mmproj-F16.gguf` oder ein Laden ohne
+  Projektor dürfte Tempo bringen: nicht gemessen.
+- **Serverprozess:** Zweimal endete der Arena-Server ohne erkennbaren Grund (einmal mitten im
+  Protokoll). Seither schreibt der von Claude gestartete Server nach `%TEMP%\arena-server.log`.
+  Mit `start.bat` im eigenen Fenster ist eine Fehlermeldung direkt sichtbar.
 - **Statistik:** Das Protokoll macht einen Lauf je Aufgabe. Es fehlt eine Option für n
   Wiederholungen mit Mittelwert und Streuung im Diagramm.
 - **Nur eine Mission** (Kaltstart, drei Varianten). Die Schnittstelle für weitere steht.

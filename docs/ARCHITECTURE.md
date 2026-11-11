@@ -42,6 +42,15 @@ sichtbare Objekte, Inventar und der bisherige Verlauf. Werkzeuge: `go`, `inspect
 `operate`, jeweils mit einem Feld `why` für die Begründung. `use_skill` erklärt, dass der Agent
 einem Skill folgt, und kostet keine Aktion.
 
+**Reihenfolge im Prompt:** aktueller Zustand, Hinweise, Verlauf, Notizzettel, Aufforderung. Eine
+cache-freundliche Variante (Ziel und Verlauf zuerst, Verlauf nur anhängen, damit der Modellserver
+seinen KV-Cache weiterverwenden kann) wurde ausprobiert und wieder verworfen: Mit Gemma 4 E2B
+gelangen damit 0 von 3 Läufen statt 3 von 3, und schneller wurde es in der Messung nicht.
+
+**Notizzettel (`cfg.notepad`):** Mit Schalter bekommt jedes Werkzeug das Pflichtfeld `note`. Was der Agent
+dort schreibt, steht im nächsten Schritt unter `YOUR NOTEPAD` und ersetzt die vorige Notiz
+(`NOTE_LIMIT` = 400 Zeichen). Ohne Schalter gibt es weder Feld noch Zeile.
+
 Zwei Hilfen gelten für alle Memory-Bedingungen gleich und sind kein Langzeitgedächtnis:
 
 - **Arbeitsgedächtnis des Versuchs:** Der Prompt nennt, was der Agent in anderen Räumen schon

@@ -19,6 +19,12 @@
     <div id="sim-badge" class="chip warn" hidden>SIMULATION · kein Sprachmodell</div>
     <div class="spacer"></div>
     <div id="model-chip" class="chip off">nicht verbunden</div>
+    <select id="music-src" class="chip ghost" title="Woher kommt der Ton?">
+      <option value="tab">Ton: Tab / System</option>
+      <option value="mic">Ton: Mikrofon</option>
+      <option value="demo">Ton: Demo-Signal</option>
+    </select>
+    <button id="music" class="chip ghost" title="Musik-Modus umschalten: aus, Equalizer, Schwarm, beides">Musik: aus</button>
     <button id="quality" class="chip ghost" title="Grafikqualität umschalten">Grafik: Auto</button>
   </header>
 
@@ -38,6 +44,7 @@
       <label>Memory-Bank<input id="bank" value="default" spellcheck="false"></label>
       <label class="check"><input id="learn" type="checkbox" checked> lernt</label>
     </div>
+    <label class="check" title="Der Agent schreibt bei jeder Entscheidung eine kurze Notiz (Diagnose und Plan, max. 400 Zeichen), die er im nächsten Schritt wieder liest. Ohne Zettel sieht er nur, was er getan hat, nicht warum."><input id="notepad" type="checkbox"> Notizzettel des Agenten (trägt seinen Plan weiter)</label>
     <label class="check"><input id="simulated" type="checkbox"> Simulationsmodus (ohne Modell, nur UI-Test)</label>
     <div class="row">
       <button id="start" class="primary">Mission starten</button>

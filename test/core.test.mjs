@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as m from '../server/missions/coldstart.mjs';
 import { judge, buildContext, learn } from '../server/memory.mjs';
-import { parseAction, runEpisode } from '../server/agent.mjs';
+import { parseAction, runEpisode, NOTE_LIMIT } from '../server/agent.mjs';
 
 const play = (world, plan) => plan.map((a) => m.apply(world, a));
 
@@ -119,4 +119,27 @@ test('Simulationsmodus ist gekennzeichnet und ruft kein Modell auf', async () =>
   assert.equal(run.model, null);
   assert.equal(run.llmCalls, 0);
   assert.ok(run.steps > 0 && run.events.at(-1).type === 'run_end');
+});
+
+test('Notizzettel: nur wenn eingeschaltet, wandert in den nächsten Prompt und ist begrenzt', async () => {
+  const prompts = [];
+  const reply = (args) => ({ message: { tool_calls: [{ function: { name: 'inspect', arguments: JSON.stringify(args) } }] }, latencyMs: 1, promptTokens: 1, completionTokens: 1 });
+  const llm = async (req) => { prompts.push(req); return reply({ target: 'directory', why: 'look', note: prompts.length === 1 ? 'Plan: read terminal, fix inhibits, start.' : 'x'.repeat(2000) }); };
+  const cfg = { id: 'n', mission: 'coldstart', variant: 'standard', seed: 1, condition: 'none', maxSteps: 3 };
+  const on = await runEpisode({ cfg: { ...cfg, notepad: true }, llm });
+  const user = (i) => prompts[i].messages[1].content;
+  assert.match(user(0), /YOUR NOTEPAD.*\(empty\)/);
+  assert.ok(prompts[0].tools[0].function.parameters.required.includes('note'), 'mit Zettel ist "note" Pflicht');
+  assert.match(user(1), /YOUR NOTEPAD \(you wrote this last turn\): Plan: read terminal, fix inhibits, start\./);
+  assert.ok(user(2).match(/YOUR NOTEPAD[^\n]*/)[0].length < NOTE_LIMIT + 60, 'Zettel ist gekappt');
+  assert.ok(prompts[0].tools[0].function.parameters.properties.note, 'Feld "note" im Werkzeug-Schema');
+  assert.equal(on.notepad, true);
+  assert.equal(on.noteUpdates, 3);
+  assert.ok(on.events.find((e) => e.type === 'step').note);
+
+  prompts.length = 0;
+  const off = await runEpisode({ cfg, llm });
+  assert.ok(!user(0).includes('NOTEPAD') && !prompts[0].tools[0].function.parameters.properties.note);
+  assert.equal(off.noteUpdates, 0);
+  assert.ok(!user(1).includes('Plan: read terminal'), 'ohne Schalter wird nichts weitergetragen');
 });

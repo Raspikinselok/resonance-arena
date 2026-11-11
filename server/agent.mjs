@@ -20,6 +20,10 @@ const TOOLS = [
   fn('use', 'Use a carried item on a visible object.', { item: param('Item id listed under CARRYING.'), target: param('Object id listed under VISIBLE.') }),
   fn('operate', 'Send a command to a visible device.', { device: param('Device id listed under VISIBLE.'), command: param('One of the commands shown for that device.') }),
 ];
+// Notizzettel: optionales Feld an jedem Werkzeug. Der Agent schreibt ihn selbst, er steht im nächsten Schritt wieder im Prompt.
+export const NOTE_LIMIT = 400; // Zeichen, grob 100 Tokens
+const NOTE = param('Your private notepad, carried to your next turn. Write your diagnosis so far and the remaining plan in at most 50 words. It replaces the previous note.');
+const withNote = (tools) => tools.map((t) => ({ ...t, function: { ...t.function, parameters: { ...t.function.parameters, properties: { ...t.function.parameters.properties, note: NOTE }, required: [...t.function.parameters.required, 'note'] } } }));
 const SKILL_TOOL = fn('use_skill', 'Declare that you now follow a skill from memory. Costs no action.', { skill_id: param('Skill id, e.g. S1.') });
 
 const SYSTEM = `You are the control AI of a maintenance robot aboard the abandoned research station Kepler-9.
@@ -35,6 +39,7 @@ const JSON_MODE = `
 Reply with ONLY one JSON object and nothing else:
 {"tool": "go|inspect|take|use|operate", "args": {...}, "why": "short reason"}
 Args per tool: go {"room"}, inspect {"target"}, take {"item"}, use {"item","target"}, operate {"device","command"}.`;
+const JSON_NOTE = '\nWith the notepad the object MUST have four keys: {"tool": ..., "args": {...}, "why": "...", "note": "what you know now and the steps still to do, max 50 words"}. Rewrite "note" every turn.';
 
 const cut = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
 const fmtAction = (a) => `${a.tool}(${Object.entries(a.args ?? {}).map(([k, v]) => `${k}=${v}`).join(', ')})`;
@@ -54,7 +59,10 @@ function notes(obs, history, seen) {
   return lines;
 }
 
-function renderTurn(obs, step, maxSteps, history, declared = [], seen = {}) {
+// Reihenfolge: aktueller Zustand zuerst, Verlauf danach, Notizzettel und Aufforderung am Ende.
+// Eine cache-freundliche Variante (Verlauf zuerst, nur anhängen) wurde am 11.11.2026 mit Gemma 4 E2B
+// gemessen: 0 von 3 Läufen erfolgreich statt 3 von 3 mit dieser Reihenfolge. Deshalb bleibt es so.
+function renderTurn(obs, step, maxSteps, history, declared = [], seen = {}, note = null) {
   const vis = obs.visible.map((v) => `${v.id} [${v.kind}${v.commands.length ? ': ' + v.commands.join('|') : ''}]`).join(', ') || 'nothing';
   const past = history.map((h, i) => {
     const recent = i >= history.length - 8;
@@ -70,8 +78,9 @@ function renderTurn(obs, step, maxSteps, history, declared = [], seen = {}) {
     ...notes(obs, history, seen),
     declared.length ? `SKILL IN USE: ${declared.join(', ')} (already declared; now act in the world)` : null,
     past.length ? `ACTIONS SO FAR:\n${past.join('\n')}` : 'ACTIONS SO FAR: none',
-    'Choose your next action.',
-  ].filter(Boolean).join('\n');
+    note === null ? null : `YOUR NOTEPAD (you wrote this last turn): ${note || '(empty)'}`,
+    note === null ? 'Choose your next action.' : 'Choose your next action and rewrite your notepad in "note": what you know now and the steps still to do.',
+  ].filter((x) => x !== null).join('\n');
 }
 
 // Liest die Entscheidung aus der Modellantwort: Tool-Call oder JSON im Text.
@@ -95,9 +104,11 @@ export function parseAction(message) {
     }
   }
   if (typeof tool !== 'string' || !args || typeof args !== 'object') return null;
-  const { why, tool: _t, action: _a, name: _n, args: _x, ...rest } = args;
-  const top = call ? undefined : extractJson(message?.content ?? '')?.why;
-  return { tool: tool.trim().toLowerCase(), args: rest, why: typeof why === 'string' ? why : typeof top === 'string' ? top : '', viaToolCall: Boolean(call) };
+  const { why, note, tool: _t, action: _a, name: _n, args: _x, ...rest } = args;
+  const whole = call ? {} : extractJson(message?.content ?? '') ?? {};
+  const top = whole.why;
+  const memo = typeof note === 'string' ? note : typeof whole.note === 'string' ? whole.note : null;
+  return { tool: tool.trim().toLowerCase(), args: rest, why: typeof why === 'string' ? why : typeof top === 'string' ? top : '', note: memo, viaToolCall: Boolean(call) };
 }
 
 // Simulationsmodus: zufällige gültige Aktionen, KEIN Sprachmodell. Nur für UI-Tests.
@@ -127,16 +138,17 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
     id: cfg.id, startedAt: new Date().toISOString(), mission: cfg.mission, objective: mission.objective,
     variant: cfg.variant, seed: cfg.seed, condition: cfg.condition, bank: cfg.bank ?? null, learn: Boolean(cfg.learn),
     phase: cfg.phase ?? 'single', protocolId: cfg.protocolId ?? null,
-    thinking: Boolean(cfg.thinking), simulated: Boolean(cfg.simulated), model: cfg.simulated ? null : cfg.model, modelReported: null,
+    notepad: Boolean(cfg.notepad), thinking: Boolean(cfg.thinking), simulated: Boolean(cfg.simulated), model: cfg.simulated ? null : cfg.model, modelReported: null,
     baseUrl: cfg.simulated ? null : cfg.baseUrl, provider: cfg.provider ?? null, maxSteps,
     memoryUsed, skillsDeclared: [], mode: cfg.simulated ? 'simulation' : 'tools',
-    steps: 0, invalid: 0, mistakes: 0, repeats: 0, unparsed: 0, llmCalls: 0, llmErrors: 0,
+    noteUpdates: 0, steps: 0, invalid: 0, mistakes: 0, repeats: 0, unparsed: 0, llmCalls: 0, llmErrors: 0,
     latencyMs: 0, promptTokens: 0, completionTokens: 0, reasoningTokens: 0, success: false, reason: null,
   };
   say({ type: 'run_start', run: { ...run }, view: mission.spectate(world), memoryText });
 
   const hasSkills = memoryUsed.skills.length > 0;
   let toolFails = 0;
+  let note = ''; // Notizzettel des Agenten, nur aktiv mit cfg.notepad
   const seen = {}; // Raum -> dort gesehene Objekte (Arbeitsgedächtnis dieses Versuchs)
   let declares = 0;
 
@@ -153,9 +165,10 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
       if (pace) await new Promise((r) => setTimeout(r, pace));
     } else {
       const jsonMode = run.mode === 'json';
-      const system = SYSTEM + (jsonMode ? JSON_MODE + (hasSkills ? '\nOptional: {"tool":"use_skill","args":{"skill_id":"S1"}} to declare a skill.' : '') : '')
+      const system = SYSTEM + (jsonMode ? JSON_MODE + (cfg.notepad ? JSON_NOTE : '') + (hasSkills ? '\nOptional: {"tool":"use_skill","args":{"skill_id":"S1"}} to declare a skill.' : '') : '')
         + (memoryText ? `\n\n${memoryText}` : '');
-      const tools = jsonMode ? undefined : hasSkills ? [...TOOLS, SKILL_TOOL] : TOOLS;
+      const base = hasSkills ? [...TOOLS, SKILL_TOOL] : TOOLS;
+      const tools = jsonMode ? undefined : cfg.notepad ? withNote(base) : base;
       // Bei Temperatur 0 wiederholt ein kleines Modell denselben Fehlgriff endlos. Etwas Streuung als
       // Grundwert, deutlich mehr, sobald die letzten beiden Aktionen identisch gescheitert sind.
       const [a, b] = history.slice(-2);
@@ -163,7 +176,7 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
       const temperature = stuck ? 0.9 : (cfg.temperature ?? 0.3);
       let res;
       try {
-        res = await llm({ temperature, messages: [{ role: 'system', content: system }, { role: 'user', content: renderTurn(obs, stepNo, maxSteps, history, run.skillsDeclared, seen) }], tools, signal });
+        res = await llm({ temperature, messages: [{ role: 'system', content: system }, { role: 'user', content: renderTurn(obs, stepNo, maxSteps, history, run.skillsDeclared, seen, cfg.notepad ? note : null) }], tools, signal });
       } catch (err) {
         if (signal?.aborted) { run.reason = 'aborted'; break; }
         run.llmErrors += 1;
@@ -184,6 +197,7 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
       const thought = cut((res.message?.reasoning_content ?? res.message?.reasoning ?? '').trim(), 600);
       if (thought) meta.thought = thought;
       if (!action) meta.rawReply = cut(res.message?.content ?? '', 300);
+      if (cfg.notepad && action?.note?.trim()) { note = cut(action.note.trim().replace(/\s+/g, ' '), NOTE_LIMIT); run.noteUpdates += 1; meta.note = note; }
       // Liefert das Modell wiederholt keinen Tool-Call, ist der JSON-Modus die robustere Schnittstelle
       if (!jsonMode && !action?.viaToolCall && ++toolFails >= 2) { run.mode = 'json'; say({ type: 'note', text: 'Modell liefert keine Tool-Calls. Wechsle auf JSON-Modus.' }); }
     }
