@@ -42,7 +42,7 @@ export function createScene(canvas, labelLayer) {
   const labels = new CSS2DRenderer({ element: labelLayer });
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.85, 0.7, 0.2);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.6, 0.6, 0.3);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
@@ -94,7 +94,7 @@ export function createScene(canvas, labelLayer) {
       strip.position.copy(pillar.position).multiplyScalar(0.985); strip.position.y = 1.7;
       g.add(pillar, strip);
     }
-    const light = new THREE.PointLight(r.color, 14, 16, 1.8);
+    const light = new THREE.PointLight(r.color, 10, 16, 1.8);
     light.position.y = 3.2;
     g.add(light);
     const el = document.createElement('div');
@@ -302,7 +302,7 @@ export function createScene(canvas, labelLayer) {
     holoState = { online: v.online, alarm: !(v.fuseOk && v.valveOpen && v.sensorOk) };
     const text = { reactor: v.online ? 'ONLINE' : `OFFLINE${v.trips ? ` · ${v.trips}/3 Fehlstarts` : ''}`, lab: v.labLocked ? 'VERRIEGELT' : '' };
     for (const [id, fx] of Object.entries(roomFx)) fx.el.innerHTML = `<b>${ROOMS[id].label}</b>${text[id] ? `<span>${text[id]}</span>` : ''}`;
-    for (const fx of Object.values(roomFx)) fx.light.intensity = v.online ? 22 : 14;
+    for (const fx of Object.values(roomFx)) fx.light.intensity = v.online ? 16 : 10;
   }
   function moveTo(target) {
     if (!ROOMS[target] || target === room) return;
