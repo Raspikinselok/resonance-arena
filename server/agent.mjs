@@ -181,7 +181,7 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
         if (signal?.aborted) { run.reason = 'aborted'; break; }
         run.llmErrors += 1;
         // Manche Modelle/Server lehnen "tools" ab: einmal auf JSON-Modus umschalten, sonst abbrechen
-        if (!jsonMode && run.llmErrors === 1) { run.mode = 'json'; say({ type: 'note', text: `Tool-Calls abgelehnt (${cut(String(err.message), 120)}). Wechsle auf JSON-Modus.` }); continue; }
+        if (!jsonMode && run.llmErrors === 1 && err.status) { run.mode = 'json'; say({ type: 'note', text: `Tool-Calls abgelehnt (${cut(String(err.message), 120)}). Wechsle auf JSON-Modus.` }); continue; }
         run.reason = 'llm_error'; run.error = String(err.message ?? err);
         say({ type: 'note', level: 'error', text: `Modellaufruf fehlgeschlagen: ${run.error}` });
         break;

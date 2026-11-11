@@ -6,7 +6,14 @@ export const PRESETS = [
   { provider: 'Ollama', baseUrl: 'http://localhost:11434/v1' },
 ];
 
-const clean = (url) => String(url).trim().replace(/\/+$/, '');
+// Bringt eine eingegebene Adresse in die Form http://host:port/v1. "localhost:1234" und
+// "http://127.0.0.1:1234" funktionieren damit genauso wie die vollständige Adresse.
+export function clean(url) {
+  let u = String(url).trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(u)) u = `http://${u}`;
+  try { if (new URL(u).pathname.replace(/\/+$/, '') === '') u += '/v1'; } catch { /* ungültige Adresse: probe() meldet den Fehler */ }
+  return u;
+}
 
 async function getJson(url, timeoutMs) {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -73,6 +80,10 @@ export async function chat({ baseUrl, model, messages, tools, maxTokens = 350, t
     throw err;
   }
   const json = await res.json();
+  if (!Array.isArray(json.choices) || !json.choices.length) {
+    // HTTP 200 ohne Antwort: falsche Adresse oder Fehlermeldung des Servers. Nicht als Modellantwort werten.
+    throw new Error(`Modellserver liefert keine Antwort (keine "choices"): ${JSON.stringify(json.error ?? json).slice(0, 200)}`);
+  }
   const usage = json.usage ?? {};
   return {
     message: json.choices?.[0]?.message ?? {},

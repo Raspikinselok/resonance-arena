@@ -33,7 +33,7 @@ Details: `docs/ARCHITECTURE.md`.
 - `server/experiments.mjs` Einzellauf, Lernschritt, Vergleichsprotokoll
 - `server/index.mjs` HTTP-API, Ereignisstrom, statische Dateien
 - `web/scene.js` three.js-Szene, `web/app.js` Oberfläche
-- `test/` 19 Tests, `tools/` Messskripte für echte Modelle
+- `test/` 20 Tests, `tools/` Messskripte für echte Modelle
 
 ## Entscheidungen, die nicht ohne Grund kippen sollten
 

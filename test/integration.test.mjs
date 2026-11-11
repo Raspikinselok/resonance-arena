@@ -35,6 +35,7 @@ before(async () => {
     res.setHeader('Content-Type', 'application/json');
     if (req.url.endsWith('/models')) return res.end(JSON.stringify({ data: [{ id: 'mock-model' }, { id: 'mock-json' }, { id: 'text-embedding-mock' }] }));
     if (req.url.includes('/api/v0/')) { res.statusCode = 404; return res.end('{}'); }
+    if (!req.url.startsWith('/v1/')) return res.end(JSON.stringify({ error: 'Unexpected endpoint or method. (POST ' + req.url + ')' })); // so antwortet LM Studio mit HTTP 200
     let raw = ''; for await (const c of req) raw += c;
     const body = JSON.parse(raw);
     const system = body.messages.find((x) => x.role === 'system')?.content ?? '';
@@ -159,4 +160,19 @@ test('fehlende Dateien liefern 404 und beenden den Server nicht (Browser fragt z
   const page = await fetch(`http://127.0.0.1:${arena.port}/`);
   assert.equal(page.status, 200);
   assert.match(await page.text(), /RESONANCE ARENA/);
+});
+
+test('Adresse ohne /v1 wird ergänzt; Antworten ohne Inhalt brechen den Lauf ab statt das Budget zu verbrennen', async () => {
+  const short = mockUrl.replace(/\/v1$/, '');
+  const c = await api('/api/connect', { baseUrl: short });
+  assert.ok(c.ok);
+  assert.equal(c.baseUrl, mockUrl, 'verbinden liefert die vollständige Adresse zurück');
+  let runs = await runAndWait('/api/runs', { baseUrl: short.replace('http://', ''), condition: 'none', seed: 5, fault: 'coolant' });
+  assert.ok(runs.at(-1).success, 'Lauf mit verkürzter Adresse funktioniert');
+
+  runs = await runAndWait('/api/runs', { baseUrl: short + '/falsch', condition: 'none', seed: 5, fault: 'coolant' });
+  const bad = runs.at(-1);
+  assert.equal(bad.reason, 'llm_error');
+  assert.equal(bad.steps, 0, 'keine Aktion wird gezählt');
+  assert.match(bad.error, /keine Antwort/);
 });

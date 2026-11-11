@@ -9,7 +9,7 @@ Auf dem PC: Repo klonen, `start.bat`, in der Arena Qwen wählen. Am Code ist nic
 
 ## Was nachweislich funktioniert
 
-- `npm test`: 19 von 19 Tests grün (Laptop). Sie prüfen Welt, Lösbarkeit aller Varianten für
+- `npm test`: 20 von 20 Tests grün (Laptop). Sie prüfen Welt, Lösbarkeit aller Varianten für
   40 Seeds, Skill-Regeln und den kompletten Weg über die HTTP-API gegen eine Modell-Attrappe.
 - **Echter Modelltest mit `gemma-4-e2b-it@q4_k_m`:** verbinden, Mission, Beobachtung,
   Modellentscheidung, Aktion, Ergebnis, Reflexion, Skill speichern, neuer Lauf mit Skill im
@@ -77,6 +77,12 @@ Tonfreigabe aus einem echten Tab ist ungetestet, weil sie einen Klick im Freigab
 **Behobener Absturz:** Der Server beendete sich mehrfach (einmal mitten im Protokoll). Ursache: Jede
 Anfrage nach einer fehlenden Datei, etwa `/favicon.ico` von Chrome, löste einen Fehler beim Senden
 der Kopfzeilen aus. Behoben und per Test abgesichert.
+
+**Behobene Falle bei der Adresse:** Mit `http://127.0.0.1:1234` (ohne `/v1`) im Feld Modellserver
+fand die Arena zwar die Modelle, jeder Modellaufruf lief aber ins Leere. LM Studio antwortet dort
+mit HTTP 200 und einer Fehlermeldung, die Arena wertete das als leere Modellantwort und verbrauchte
+in Sekunden das ganze Budget. Jetzt wird `/v1` ergänzt, und eine Antwort ohne Inhalt bricht den Lauf
+als Modellfehler ab. Die dabei entstandenen ungültigen Läufe liegen in `data-ungueltig/`.
 
 ## Der erste interessante Versuch für dich
 
