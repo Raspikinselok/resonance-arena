@@ -1,0 +1,10 @@
+# Einheitliche Zeilenenden, damit Laptop und PC keine Schein-Änderungen erzeugen
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.glb binary
+*.gltf binary
+*.ktx2 binary
+*.hdr binary

@@ -1,0 +1,44 @@
+# Abhängigkeiten und Build
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Geheimnisse und lokale Konfiguration - niemals committen
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# Modelle und große Binärdateien - gehören nicht ins Repo
+*.gguf
+*.safetensors
+*.bin
+*.onnx
+models/
+
+# Laufzeitdaten der Arena (Experimente, Agenten-Gedächtnis, Logs)
+data/
+runs/
+logs/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Editor und Betriebssystem
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
