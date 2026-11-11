@@ -42,8 +42,17 @@ sichtbare Objekte, Inventar und der bisherige Verlauf. Werkzeuge: `go`, `inspect
 `operate`, jeweils mit einem Feld `why` für die Begründung. `use_skill` erklärt, dass der Agent
 einem Skill folgt, und kostet keine Aktion.
 
-`parseAction()` akzeptiert drei Formen: echten Tool-Call, JSON im Text, Aufruf als Text
-(`go(room=atrium)`). Liefert ein Modell zweimal keinen Tool-Call, wechselt der Lauf in den
+Zwei Hilfen gelten für alle Memory-Bedingungen gleich und sind kein Langzeitgedächtnis:
+
+- **Arbeitsgedächtnis des Versuchs:** Der Prompt nennt, was der Agent in anderen Räumen schon
+  gesehen hat, welche Räume er noch nicht kennt und welche Aktionen bereits gescheitert sind.
+  Zielt eine Aktion auf ein Objekt aus einem anderen Raum, sagt die Fehlermeldung, wo er es sah.
+- **Temperatur:** Grundwert 0,3. Scheitert dieselbe Aktion zweimal in Folge, steigt sie für den
+  nächsten Aufruf auf 0,9. Bei Temperatur 0 wiederholte Gemma 4 E2B denselben Fehlgriff, bis das
+  Budget leer war. Der Seed wird an den Server mitgegeben.
+
+`parseAction()` akzeptiert vier Formen (Tool-Call, JSON, Text-Aufruf, Gemmas natives Format): echten Tool-Call, JSON im Text, Aufruf als Text
+(`go(room=atrium)`) und `go{room:<|"|>atrium<|"|>}`. Liefert ein Modell zweimal keinen Tool-Call, wechselt der Lauf in den
 JSON-Modus (`run.mode`).
 
 ## Memory (`memory.mjs`)

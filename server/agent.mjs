@@ -39,7 +39,22 @@ Args per tool: go {"room"}, inspect {"target"}, take {"item"}, use {"item","targ
 const cut = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
 const fmtAction = (a) => `${a.tool}(${Object.entries(a.args ?? {}).map(([k, v]) => `${k}=${v}`).join(', ')})`;
 
-function renderTurn(obs, step, maxSteps, history, declared = []) {
+// Arbeitsgedächtnis innerhalb EINES Versuchs (kein Langzeit-Memory, gilt für alle Bedingungen gleich):
+// was der Agent in anderen Räumen schon gesehen hat und welche Aktionen bereits gescheitert sind.
+function notes(obs, history, seen) {
+  const lines = [];
+  const elsewhere = Object.entries(seen).filter(([room]) => room !== obs.room).map(([room, things]) => `${room}: ${things.join(', ') || 'nothing'}`);
+  if (elsewhere.length) lines.push(`SEEN IN OTHER ROOMS: ${elsewhere.join(' / ')}`);
+  const unvisited = [...new Set(Object.keys(seen).length ? ['atrium', 'reactor', 'control', 'storage', 'lab'] : [])].filter((r) => !seen[r]);
+  if (unvisited.length) lines.push(`NOT VISITED YET: ${unvisited.join(', ')}`);
+  const failed = new Map();
+  for (const h of history) if (!h.result.ok) { const k = fmtAction(h.action); failed.set(k, { n: (failed.get(k)?.n ?? 0) + 1, text: h.result.text }); }
+  const list = [...failed].slice(-6).map(([k, v]) => `- ${k}${v.n > 1 ? ` (tried ${v.n}x)` : ''}: ${cut(v.text.replace(/\s+/g, ' '), 90)}`);
+  if (list.length) lines.push(`FAILED BEFORE, do not repeat:\n${list.join('\n')}`);
+  return lines;
+}
+
+function renderTurn(obs, step, maxSteps, history, declared = [], seen = {}) {
   const vis = obs.visible.map((v) => `${v.id} [${v.kind}${v.commands.length ? ': ' + v.commands.join('|') : ''}]`).join(', ') || 'nothing';
   const past = history.map((h, i) => {
     const recent = i >= history.length - 8;
@@ -52,6 +67,7 @@ function renderTurn(obs, step, maxSteps, history, declared = []) {
     `EXITS: ${obs.exits.join(', ')}`,
     `VISIBLE: ${vis}`,
     `CARRYING: ${obs.inventory.join(', ') || 'nothing'}`,
+    ...notes(obs, history, seen),
     declared.length ? `SKILL IN USE: ${declared.join(', ')} (already declared; now act in the world)` : null,
     past.length ? `ACTIONS SO FAR:\n${past.join('\n')}` : 'ACTIONS SO FAR: none',
     'Choose your next action.',
@@ -121,12 +137,14 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
 
   const hasSkills = memoryUsed.skills.length > 0;
   let toolFails = 0;
+  const seen = {}; // Raum -> dort gesehene Objekte (Arbeitsgedächtnis dieses Versuchs)
   let declares = 0;
 
   while (!world.done && run.steps < maxSteps) {
     if (signal?.aborted) { run.reason = 'aborted'; break; }
     const obs = mission.observe(world);
     const stepNo = run.steps + 1;
+    seen[obs.room] = obs.visible.map((v) => `${v.id}${v.commands.length ? ` [${v.commands.join('|')}]` : ''}`);
     say({ type: 'thinking', step: stepNo });
 
     let action, meta = {};
@@ -138,9 +156,14 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
       const system = SYSTEM + (jsonMode ? JSON_MODE + (hasSkills ? '\nOptional: {"tool":"use_skill","args":{"skill_id":"S1"}} to declare a skill.' : '') : '')
         + (memoryText ? `\n\n${memoryText}` : '');
       const tools = jsonMode ? undefined : hasSkills ? [...TOOLS, SKILL_TOOL] : TOOLS;
+      // Bei Temperatur 0 wiederholt ein kleines Modell denselben Fehlgriff endlos. Etwas Streuung als
+      // Grundwert, deutlich mehr, sobald die letzten beiden Aktionen identisch gescheitert sind.
+      const [a, b] = history.slice(-2);
+      const stuck = a && b && !b.result.ok && JSON.stringify(a.action) === JSON.stringify(b.action);
+      const temperature = stuck ? 0.9 : (cfg.temperature ?? 0.3);
       let res;
       try {
-        res = await llm({ messages: [{ role: 'system', content: system }, { role: 'user', content: renderTurn(obs, stepNo, maxSteps, history, run.skillsDeclared) }], tools, signal });
+        res = await llm({ temperature, messages: [{ role: 'system', content: system }, { role: 'user', content: renderTurn(obs, stepNo, maxSteps, history, run.skillsDeclared, seen) }], tools, signal });
       } catch (err) {
         if (signal?.aborted) { run.reason = 'aborted'; break; }
         run.llmErrors += 1;
@@ -174,7 +197,16 @@ export async function runEpisode({ cfg, llm, memoryText = '', memoryUsed = { epi
 
     let result;
     if (!action) { result = { ok: false, error: 'unparsed', text: 'No valid action in the reply. Choose exactly one tool.' }; run.unparsed += 1; }
-    else result = mission.apply(world, action);
+    else {
+      result = mission.apply(world, action);
+      // Zielt die Aktion auf etwas, das der Agent in einem ANDEREN Raum gesehen hat, sagt ihm das sein Arbeitsgedächtnis.
+      // Das verrät nichts Verborgenes: Die Information stammt aus seinen eigenen Beobachtungen.
+      if (!result.ok && result.error === 'invalid') {
+        const wanted = [action.args.device, action.args.target, action.args.item].filter((x) => typeof x === 'string');
+        const where = Object.entries(seen).find(([room, things]) => room !== obs.room && things.some((t) => wanted.includes(t.split(' ')[0])));
+        if (where) result = { ...result, text: `${result.text} You saw it in the ${where[0]}: walk there first (via the atrium).` };
+      }
+    }
     run.steps += 1;
     if (!result.ok) { if (result.error === 'mistake') run.mistakes += 1; else run.invalid += 1; }
     const act = action ? { tool: action.tool, args: action.args } : { tool: 'none', args: {} };
