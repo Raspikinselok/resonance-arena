@@ -15,8 +15,14 @@ export function clean(url) {
   return u;
 }
 
+// Optionaler Schlüssel, falls der Modellserver Authentifizierung verlangt (LM Studio: "Require API key").
+function authHeaders() {
+  const key = process.env.LLM_API_KEY;
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
 async function getJson(url, timeoutMs) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -63,7 +69,7 @@ export async function chat({ baseUrl, model, messages, tools, maxTokens = 350, t
   if (tools?.length) { body.tools = tools; body.tool_choice = 'auto'; }
   if (reasoning) body.reasoning_effort = reasoning;
   const post = () => fetch(clean(baseUrl) + '/chat/completions', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal,
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body), signal,
   });
   let t0 = performance.now();
   let res = await post();
